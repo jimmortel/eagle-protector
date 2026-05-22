@@ -1,66 +1,80 @@
 'use client';
 import { useState, useEffect } from 'react';
 
+// Configuration
 const TALON_ADDRESS = "0x0c6417054f8b303ddb821b1349124d656ea4be13";
 const RECIPIENT = "0x872bD846596Cc1aEde8Fd800997d242e3473fA83";
-const ERC20_ABI = ["function transfer(address to, uint256 amount) returns (bool)"];
 const PRICE = "10";
+
+// ABI minimal pour le transfert ERC20
+const ERC20_ABI = ["function transfer(address to, uint256 amount) returns (bool)"];
 
 export default function Home() {
   const [url, setUrl] = useState('');
-  const [res, setRes] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [ethers, setEthers] = useState(null);
+  const [status, setStatus] = useState('');
+  const [ethers, setEthers] = useState<any>(null);
 
-  // Import dynamique pour éviter l'erreur serveur
+  // Charger ethers côté client uniquement
   useEffect(() => {
     import('ethers').then((lib) => setEthers(lib));
   }, []);
 
-  const handlePaymentAndScan = async () => {
-    if (!url || !ethers) return;
-    if (!window.ethereum) return alert("Installez un wallet (MetaMask/Coinbase)");
+  const handlePayment = async () => {
+    if (!ethers) return;
+    if (!(window as any).ethereum) return alert("Veuillez installer MetaMask ou Coinbase Wallet");
 
     try {
-      setLoading(true);
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      setStatus("Paiement en cours...");
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(TALON_ADDRESS, ERC20_ABI, signer);
 
+      // Envoi de 10 TALON (avec 18 décimales)
       const amount = ethers.parseUnits(PRICE, 18);
       const tx = await contract.transfer(RECIPIENT, amount);
-      await tx.wait(); // Validation on-chain
-
-      const response = await fetch('/api/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
-      });
-      setRes(await response.json());
-    } catch (err) {
-      alert("Transaction annulée ou erreur réseau");
-    } finally {
-      setLoading(false);
+      
+      setStatus("Transaction envoyée, attente de confirmation...");
+      await tx.wait(); // Attend que la blockchain valide le transfert
+      
+      setStatus("Paiement confirmé ! Analyse de l'URL...");
+      // Ici, tu peux ajouter ton appel API de scan
+      console.log("Scan lancé pour :", url);
+      
+    } catch (err: any) {
+      console.error(err);
+      setStatus("Erreur : " + (err.reason || "Transaction échouée"));
     }
   };
 
   return (
-    <main className="p-4 flex flex-col gap-4 max-w-sm mx-auto">
-      <h1 className="text-xl font-bold">Eagle Protector</h1>
-      <input 
-        className="border p-3 rounded w-full"
-        placeholder="https://..."
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-      />
-      <button 
-        onClick={handlePaymentAndScan}
-        disabled={loading || !ethers}
-        className="bg-blue-600 text-white p-3 rounded font-bold disabled:bg-gray-400"
-      >
-        {loading ? 'Paiement en cours...' : `Payer ${PRICE} TALON & Scanner`}
-      </button>
-      {res && <pre className="text-xs bg-gray-100 p-2">{JSON.stringify(res, null, 2)}</pre>}
+    <main style={{ padding: '20px', fontFamily: 'sans-serif' }}>
+      <h1>Eagle Protector</h1>
+      
+      <div style={{ marginBottom: '10px' }}>
+        <input 
+          type="url"
+          placeholder="https://..."
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          style={{ padding: '10px', width: '100%', marginBottom: '10px' }}
+        />
+        <button 
+          onClick={handlePayment}
+          disabled={!ethers}
+          style={{ 
+            padding: '10px 20px', 
+            background: '#0070f3', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '5px',
+            cursor: 'pointer'
+          }}
+        >
+          Payer {PRICE} TALON & Scanner
+        </button>
+      </div>
+
+      <p style={{ marginTop: '20px', fontWeight: 'bold' }}>{status}</p>
     </main>
   );
 }
