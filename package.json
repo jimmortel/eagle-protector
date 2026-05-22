@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm install && next build",
+    "build": "npm install ethers && next build",
     "start": "next start",
     "lint": "echo 'skip'"
   },
