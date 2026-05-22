@@ -1,4 +1,4 @@
-      'use client';
+'use client';
 import { useState, useEffect } from 'react';
 
 const TALON_ADDRESS = "0x0c6417054f8b303ddb821b1349124d656ea4be13";
@@ -10,26 +10,26 @@ export default function Home() {
   const [url, setUrl] = useState('');
   const [res, setRes] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [ethersLib, setEthersLib] = useState(null);
+  const [ethers, setEthers] = useState(null);
 
-  // Charger ethers uniquement côté client
+  // Import dynamique pour éviter l'erreur serveur
   useEffect(() => {
-    import('ethers').then((m) => setEthersLib(m));
+    import('ethers').then((lib) => setEthers(lib));
   }, []);
 
   const handlePaymentAndScan = async () => {
-    if (!url || !ethersLib) return;
-    if (!window.ethereum) return alert("Installez MetaMask/Coinbase Wallet");
+    if (!url || !ethers) return;
+    if (!window.ethereum) return alert("Installez un wallet (MetaMask/Coinbase)");
 
     try {
       setLoading(true);
-      const provider = new ethersLib.BrowserProvider(window.ethereum);
+      const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      const contract = new ethersLib.Contract(TALON_ADDRESS, ERC20_ABI, signer);
+      const contract = new ethers.Contract(TALON_ADDRESS, ERC20_ABI, signer);
 
-      const amount = ethersLib.parseUnits(PRICE, 18);
+      const amount = ethers.parseUnits(PRICE, 18);
       const tx = await contract.transfer(RECIPIENT, amount);
-      await tx.wait(); 
+      await tx.wait(); // Validation on-chain
 
       const response = await fetch('/api/scan', {
         method: 'POST',
@@ -38,8 +38,7 @@ export default function Home() {
       });
       setRes(await response.json());
     } catch (err) {
-      console.error(err);
-      alert("Erreur transaction : vérifiez que vous êtes sur Base et avez assez de TALON");
+      alert("Transaction annulée ou erreur réseau");
     } finally {
       setLoading(false);
     }
@@ -56,10 +55,10 @@ export default function Home() {
       />
       <button 
         onClick={handlePaymentAndScan}
-        disabled={loading || !ethersLib}
+        disabled={loading || !ethers}
         className="bg-blue-600 text-white p-3 rounded font-bold disabled:bg-gray-400"
       >
-        {loading ? 'Transaction en cours...' : `Payer ${PRICE} TALON & Scanner`}
+        {loading ? 'Paiement en cours...' : `Payer ${PRICE} TALON & Scanner`}
       </button>
       {res && <pre className="text-xs bg-gray-100 p-2">{JSON.stringify(res, null, 2)}</pre>}
     </main>
